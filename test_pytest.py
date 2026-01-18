@@ -8,7 +8,3 @@ def test_login():
 def test_m2():
     a="selenium"
     assert False
-
-def test_m3():
-    a = "selenium"
-    assert False
