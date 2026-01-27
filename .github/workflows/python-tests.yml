@@ -30,6 +30,9 @@ jobs:
       - name: Start Flask app
         run: |
           export PYTHONPATH="${GITHUB_WORKSPACE}"
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          pwd
+          ls -la
           nohup python src/page.py > app.log 2>&1 &
           echo $! > app.pid
 
@@ -52,8 +55,13 @@ jobs:
 
       - name: Run Tests
             # We use 'always()' so the report generates even if tests fail
+
         if: always()
-        run: pytest --browser chromium --env=local
+        run: |
+          export PYTHONPATH="${GITHUB_WORKSPACE}"
+          pwd
+          ls -la
+          pytest --browser chromium --env=local
         env:
         # Pass your .env variables from GitHub Secrets
           BASE_URL: ${{ secrets.BASE_URL }}
