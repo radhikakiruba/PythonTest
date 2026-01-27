@@ -2,7 +2,7 @@
 from flask import Flask, request, jsonify, render_template_string
 import os
 
-from utils.paths import ROOT_DIR
+from tests.utils.paths import ROOT_DIR
 
 app = Flask(__name__)
 
