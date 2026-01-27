@@ -79,8 +79,8 @@ jobs:
         run: |
           export PYTHONPATH="${GITHUB_WORKSPACE}"
           ls -la 
-          npx --yes allure generate allure-results --clean -o allure-report
-    
+          rm -rf allure-report
+          npx --yes allure generate allure-results -o allure-report    
 
       - name: Upload Allure report
         if: always()
