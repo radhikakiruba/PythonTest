@@ -29,6 +29,7 @@ jobs:
 
       - name: Start Flask app
         run: |
+          export PYTHONPATH="${GITHUB_WORKSPACE}"
           nohup python src/page.py > app.log 2>&1 &
           echo $! > app.pid
 
