@@ -1,4 +1,4 @@
-name: Python Tests
+name: CI/CD Pipeline - Structured Extraction Tool
 
 on:
   push:
@@ -6,85 +6,88 @@ on:
   pull_request:
     branches: [ "main" ]
 
-permissions:
-  contents: write
-
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
+      # 1. Orchestrate Services
+      - name: Start Infrastructure (DB & LocalStack)
+        run: docker-compose up -d db localstack
+
+      # 2. Setup Python Environment
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install playwright
+          pip install playwright pytest-playwright allure-pytest
+          playwright install --with-deps
 
-      - name: Install Playwright Browsers
-        run: playwright install --with-deps
+      # 3. Initialize Mock AWS Infrastructure
+      # We use the 'localstack' CLI/awslocal to ensure S3/SQS exist before the app starts
+      - name: Initialize AWS Resources
+        run: |
+          pip install awscli-local
+          awslocal s3 mb s3://uploads-bucket
+          awslocal sqs create-queue --queue-name extraction-queue
 
-      - name: Start Flask app
+      # 4. Start Flask App & Worker in Background
+      - name: Start App and Worker
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/consultation_db
+          AWS_ENDPOINT_URL: http://localhost:4566
+          TEST_MODE: "true" # Enables deterministic Mock LLM responses
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
         run: |
           export PYTHONPATH="${GITHUB_WORKSPACE}"
-          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
-          pwd
-          ls -la
-          nohup python src/page.py > app.log 2>&1 &
-          echo $! > app.pid
+          nohup python src/page.py > flask.log 2>&1 &
+          nohup python src/worker.py > worker.log 2>&1 &
 
-      - name: Wait for app to be ready
+      # 5. Wait for Health Check
+      - name: Wait for App Readiness
         run: |
-          for i in {1..60}; do
-            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
-              echo "App is up!"
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8000/health >/dev/null; then
+              echo "App is ready!"
               exit 0
             fi
-            sleep 1
+            sleep 2
           done
-          echo "App did not start"
-          tail -200 app.log || true
+          echo "Health check failed. Logs:"
+          tail -n 50 flask.log
           exit 1
-      # Flask example:
 
-
-
-      - name: Run Tests
-            # We use 'always()' so the report generates even if tests fail
-
-        if: always()
-        run: |
-          export PYTHONPATH="${GITHUB_WORKSPACE}"
-          pwd
-          ls -la
-          pytest --browser chromium --env=local  --alluredir=allure-results
+      # 6. Execute Deterministic Tests
+      - name: Run E2E & Integration Tests
         env:
-        # Pass your .env variables from GitHub Secrets
-          BASE_URL: ${{ secrets.BASE_URL }}
+          BASE_URL: http://localhost:8000
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/consultation_db
+          AWS_ENDPOINT_URL: http://localhost:4566
+        run: pytest tests/ --alluredir=allure-results
 
-      - name: Set up Node (for Allure 3 CLI)
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Generate Allure report
+      # 7. Reporting Logic
+      - name: Generate Allure Report
         if: always()
         run: |
-          export PYTHONPATH="${GITHUB_WORKSPACE}"
-          ls -la 
-          rm -rf allure-report
-          npx --yes allure generate allure-results -o allure-report    
+          npx --yes allure generate allure-results -o allure-report
 
-      - name: Upload Allure report
+      - name: Upload Test Artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: allure-report
+          name: test-results-report
           path: allure-report
+
+      # 8. Cleanup
+      - name: Stop Services
+        if: always()
+        run: docker-compose down

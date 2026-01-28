@@ -1,0 +1,22 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://test_user:test_password@db:5432/consultation_db
+      - AWS_ENDPOINT_URL=http://localstack:4566
+    depends_on:
+      - db
+      - localstack
+
+  worker:
+    build: .
+    # This overrides the CMD ["python", "src/page.py"] from the Dockerfile
+    command: python src/worker.py
+    environment:
+      - DATABASE_URL=postgresql://test_user:test_password@db:5432/consultation_db
+      - AWS_ENDPOINT_URL=http://localstack:4566
+    depends_on:
+      - db
+      - localstack
