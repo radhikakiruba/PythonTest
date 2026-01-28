@@ -68,16 +68,25 @@ jobs:
 
       # 6. Execute Deterministic Tests
       - name: Run E2E & Integration Tests
+
+        if: always()
+        run: |
+          export PYTHONPATH="${GITHUB_WORKSPACE}"
+          pwd
+          ls -la
+          pytest --browser chromium --env=local  --alluredir=allure-results
+
         env:
           BASE_URL: http://localhost:8000
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/consultation_db
           AWS_ENDPOINT_URL: http://localhost:4566
-        run: pytest tests/ --alluredir=allure-results
 
-      # 7. Reporting Logic
-      - name: Generate Allure Report
+      - name: Generate Allure report
         if: always()
         run: |
+          export PYTHONPATH="${GITHUB_WORKSPACE}"
+          ls -la
+          rm -rf allure-report
           npx --yes allure generate allure-results -o allure-report
 
       - name: Upload Test Artifacts
