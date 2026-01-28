@@ -16,8 +16,8 @@ jobs:
 
       # 1. Orchestrate Services
       - name: Start Infrastructure (DB & LocalStack)
-        run: docker-compose up -d db localstack
-
+        run: docker compose up -d db localstack
+        # Changed from docker-compose to docker compose
       # 2. Setup Python Environment
       - name: Set up Python
         uses: actions/setup-python@v5
