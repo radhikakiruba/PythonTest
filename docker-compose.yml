@@ -1,0 +1,31 @@
+services:
+  # 1. The Database
+  db:   # <--- This must match exactly
+    image: postgres:15
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: consultation_db
+    ports:
+      - "5432:5432"
+
+  # 2. LocalStack
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,sqs,dynamodb
+      - DEFAULT_REGION=us-east-1
+
+  # 3. Your Web App
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db          # <--- Reference must match the key above
+      - localstack
+    environment:
+      - DATABASE_URL=postgresql://test_user:test_password@db:5432/consultation_db
+      - AWS_ENDPOINT_URL=http://localstack:4566
